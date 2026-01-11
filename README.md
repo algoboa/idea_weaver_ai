@@ -9,7 +9,7 @@ AI-powered mind mapping application for brainstorming and idea generation.
 - Create, edit, and organize nodes with parent-child relationships
 - Custom node colors and styling
 - Auto-layout functionality for organized mind maps
-- Undo/redo support for all editing operations
+- Undo/redo support with efficient command pattern (50 operations history)
 
 ### AI-Powered Suggestions
 - AI-generated suggestions based on selected nodes
@@ -75,13 +75,18 @@ flutter pub get
 flutter run
 ```
 
-## Project Structure
+## Architecture
+
+### Project Structure
 
 ```
 lib/
   main.dart                           # App entry point
   firebase_options.dart               # Firebase configuration
   src/
+    core/
+      constants/                      # App-wide constants
+        canvas_constants.dart         # Canvas dimensions, zoom limits
     common_widgets/                   # Reusable UI components
       primary_button.dart
       social_login_button.dart
@@ -102,10 +107,12 @@ lib/
         presentation/
           editor_screen.dart
           widgets/
-            ai_suggestion_panel.dart
-            mind_map_canvas.dart
+            ai_suggestion_panel.dart  # Responsive AI panel
+            mind_map_canvas.dart      # Optimized with RepaintBoundary
         providers/
-          editor_provider.dart
+          editor_provider.dart        # Uses command pattern for history
+        services/
+          editor_history_service.dart # Undo/redo with command pattern
       export/                         # Export feature
         presentation/
           export_screen.dart
@@ -130,6 +137,20 @@ lib/
       voice_input_service.dart        # Voice input
 ```
 
+### Design Patterns
+
+- **State Management**: Riverpod 3.x with Notifier pattern
+- **Navigation**: go_router for declarative routing
+- **Command Pattern**: Used for undo/redo operations to minimize memory usage
+- **Robot Pattern**: Used in integration tests for cleaner test code
+
+### Performance Optimizations
+
+- `RepaintBoundary` around individual nodes for isolated repaints
+- Efficient `shouldRepaint` in CustomPainter for connection lines
+- Command pattern for undo/redo (stores deltas, not full copies)
+- `const` constructors used throughout for widget optimization
+
 ## Technology Stack
 
 - **Framework**: Flutter 3.10+
@@ -139,6 +160,45 @@ lib/
 - **AI**: Mock service (ready for integration with OpenAI, Claude, etc.)
 - **Voice**: speech_to_text package
 - **Export**: pdf package, share_plus
+
+## Testing
+
+### Unit Tests
+```bash
+flutter test test/unit/
+```
+
+### Widget Tests
+```bash
+flutter test test/
+```
+
+### Integration Tests
+```bash
+flutter test integration_test/
+```
+
+### Run All Tests with Coverage
+```bash
+flutter test --coverage
+```
+
+## Building for Production
+
+### Web
+```bash
+flutter build web --release
+```
+
+### Android
+```bash
+flutter build apk --release
+```
+
+### iOS
+```bash
+flutter build ios --release
+```
 
 ## Configuration
 
@@ -163,29 +223,15 @@ service cloud.firestore {
 }
 ```
 
-## Testing
+## Security
 
-Run unit and widget tests:
-```bash
-flutter test
-```
-
-Run integration tests:
-```bash
-flutter test integration_test/
-```
-
-## Building for Production
-
-### Android
-```bash
-flutter build apk --release
-```
-
-### iOS
-```bash
-flutter build ios --release
-```
+- Email validation uses RFC 5322 compliant regex
+- Auth error messages are sanitized to prevent account enumeration
+- Input length limits enforced:
+  - Node text: 500 characters
+  - Mind map title: 100 characters
+  - Email: 254 characters
+  - Name: 100 characters
 
 ## Contributing
 
@@ -194,6 +240,12 @@ flutter build ios --release
 3. Commit your changes
 4. Push to the branch
 5. Create a Pull Request
+
+### Code Style
+```bash
+dart format .
+flutter analyze
+```
 
 ## License
 

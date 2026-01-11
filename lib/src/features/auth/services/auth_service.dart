@@ -77,26 +77,32 @@ class AuthService {
   }
 
   /// Handle Firebase auth exceptions
+  /// Uses generic messages for credential errors to prevent account enumeration
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
+      // Generic message for credential-related errors to prevent account enumeration
       case 'user-not-found':
-        return 'No user found with this email.';
       case 'wrong-password':
-        return 'Wrong password provided.';
+      case 'invalid-credential':
+        return 'Invalid email or password. Please check your credentials and try again.';
       case 'email-already-in-use':
-        return 'An account already exists with this email.';
+        return 'Unable to create account. Please try a different email or sign in.';
       case 'invalid-email':
-        return 'The email address is not valid.';
+        return 'Please enter a valid email address.';
       case 'weak-password':
-        return 'The password is too weak.';
+        return 'Password must be at least 6 characters with a mix of letters and numbers.';
       case 'user-disabled':
-        return 'This user account has been disabled.';
+        return 'This account has been suspended. Please contact support.';
       case 'too-many-requests':
-        return 'Too many requests. Please try again later.';
+        return 'Too many attempts. Please wait a few minutes and try again.';
       case 'operation-not-allowed':
-        return 'This sign-in method is not enabled.';
+        return 'This sign-in method is currently unavailable.';
+      case 'network-request-failed':
+        return 'Network error. Please check your connection and try again.';
       default:
-        return 'An error occurred: ${e.message}';
+        // Log the actual error internally for debugging (in production, use a logging service)
+        // Don't expose internal error details to users
+        return 'Something went wrong. Please try again.';
     }
   }
 }

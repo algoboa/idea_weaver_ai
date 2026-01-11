@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/canvas_constants.dart';
 import '../../../domain/models/mind_map.dart';
 import '../../../routing/app_router.dart';
 import '../providers/editor_provider.dart';
@@ -55,13 +56,23 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         title: _buildAppBarTitle(editorState, colorScheme),
         actions: [
           IconButton(
-            icon: const Icon(Icons.undo),
-            onPressed: () => ref.read(editorProvider.notifier).undo(),
+            icon: Icon(
+              Icons.undo,
+              color: editorState.canUndo ? null : colorScheme.outline,
+            ),
+            onPressed: editorState.canUndo
+                ? () => ref.read(editorProvider.notifier).undo()
+                : null,
             tooltip: 'Undo',
           ),
           IconButton(
-            icon: const Icon(Icons.redo),
-            onPressed: () => ref.read(editorProvider.notifier).redo(),
+            icon: Icon(
+              Icons.redo,
+              color: editorState.canRedo ? null : colorScheme.outline,
+            ),
+            onPressed: editorState.canRedo
+                ? () => ref.read(editorProvider.notifier).redo()
+                : null,
             tooltip: 'Redo',
           ),
           IconButton(
@@ -195,24 +206,44 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           },
         ),
 
-        // AI Suggestion Panel
+        // AI Suggestion Panel - responsive width based on screen size
         if (_showAiPanel && _selectedNodeId != null)
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            width: 320,
-            child: AiSuggestionPanel(
-              nodeId: _selectedNodeId!,
-              nodeText: editorState.mindMap!.nodes[_selectedNodeId]?.text ?? '',
-              onClose: () => setState(() => _showAiPanel = false),
-              onSuggestionSelected: (suggestion) {
-                ref.read(editorProvider.notifier).addNode(
-                      parentId: _selectedNodeId,
-                      text: suggestion,
-                    );
-              },
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              // Mobile: full width overlay
+              // Tablet: 50% width
+              // Desktop: 320px fixed
+              final panelWidth = screenWidth < 600
+                  ? screenWidth
+                  : screenWidth < 900
+                      ? screenWidth * 0.5
+                      : 360.0;
+
+              final isMobileOverlay = screenWidth < 600;
+
+              return Positioned(
+                right: 0,
+                top: 0,
+                bottom: isMobileOverlay ? 80 : 0, // Leave space for toolbar on mobile
+                width: panelWidth,
+                child: AiSuggestionPanel(
+                  nodeId: _selectedNodeId!,
+                  nodeText: editorState.mindMap!.nodes[_selectedNodeId]?.text ?? '',
+                  onClose: () => setState(() => _showAiPanel = false),
+                  onSuggestionSelected: (suggestion) {
+                    ref.read(editorProvider.notifier).addNode(
+                          parentId: _selectedNodeId,
+                          text: suggestion,
+                        );
+                    // Auto-close panel on mobile after selection
+                    if (isMobileOverlay) {
+                      setState(() => _showAiPanel = false);
+                    }
+                  },
+                ),
+              );
+            },
           ),
 
         // Bottom toolbar
@@ -273,13 +304,15 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   void _zoomIn() {
     final currentScale = _transformController.value.getMaxScaleOnAxis();
-    final newScale = (currentScale * 1.2).clamp(0.5, 3.0);
+    final newScale = (currentScale * CanvasConstants.zoomFactor)
+        .clamp(CanvasConstants.minScale, CanvasConstants.maxScale);
     _transformController.value = Matrix4.diagonal3Values(newScale, newScale, 1.0);
   }
 
   void _zoomOut() {
     final currentScale = _transformController.value.getMaxScaleOnAxis();
-    final newScale = (currentScale / 1.2).clamp(0.5, 3.0);
+    final newScale = (currentScale / CanvasConstants.zoomFactor)
+        .clamp(CanvasConstants.minScale, CanvasConstants.maxScale);
     _transformController.value = Matrix4.diagonal3Values(newScale, newScale, 1.0);
   }
 
@@ -292,6 +325,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
+          maxLength: 500,
           decoration: const InputDecoration(
             labelText: 'Node Text',
             hintText: 'Enter node content',
@@ -338,6 +372,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
+          maxLength: 500,
           decoration: const InputDecoration(
             labelText: 'Node Text',
             border: OutlineInputBorder(),
@@ -508,6 +543,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
+          maxLength: 100,
           decoration: const InputDecoration(
             labelText: 'Title',
             border: OutlineInputBorder(),

@@ -2,22 +2,24 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/constants/canvas_constants.dart';
 import '../../../domain/models/mind_map.dart';
 import '../../home/providers/mind_map_provider.dart';
+import '../services/editor_history_service.dart';
 
-/// Editor state holding the current mind map and history
+/// Editor state holding the current mind map and editing status
 class EditorState {
   final MindMap? mindMap;
-  final List<MindMap> undoHistory;
-  final List<MindMap> redoHistory;
+  final bool canUndo;
+  final bool canRedo;
   final bool hasChanges;
   final bool isLoading;
   final String? error;
 
-  EditorState({
+  const EditorState({
     this.mindMap,
-    this.undoHistory = const [],
-    this.redoHistory = const [],
+    this.canUndo = false,
+    this.canRedo = false,
     this.hasChanges = false,
     this.isLoading = false,
     this.error,
@@ -25,16 +27,16 @@ class EditorState {
 
   EditorState copyWith({
     MindMap? mindMap,
-    List<MindMap>? undoHistory,
-    List<MindMap>? redoHistory,
+    bool? canUndo,
+    bool? canRedo,
     bool? hasChanges,
     bool? isLoading,
     String? error,
   }) {
     return EditorState(
       mindMap: mindMap ?? this.mindMap,
-      undoHistory: undoHistory ?? this.undoHistory,
-      redoHistory: redoHistory ?? this.redoHistory,
+      canUndo: canUndo ?? this.canUndo,
+      canRedo: canRedo ?? this.canRedo,
       hasChanges: hasChanges ?? this.hasChanges,
       isLoading: isLoading ?? this.isLoading,
       error: error,
@@ -45,14 +47,16 @@ class EditorState {
 /// Editor provider for managing mind map editing
 class EditorNotifier extends Notifier<EditorState> {
   static const _uuid = Uuid();
+  final EditorHistoryService _historyService = EditorHistoryService();
 
   @override
   EditorState build() {
-    return EditorState();
+    return const EditorState();
   }
 
   void loadMindMap(String id) {
     state = state.copyWith(isLoading: true, error: null);
+    _historyService.clear();
 
     try {
       final mindMapsState = ref.read(mindMapsProvider);
@@ -67,6 +71,8 @@ class EditorNotifier extends Notifier<EditorState> {
   }
 
   void createNewMindMap() {
+    _historyService.clear();
+
     final rootNode = MindMapNode(
       id: 'root',
       text: 'Central Idea',
@@ -83,55 +89,42 @@ class EditorNotifier extends Notifier<EditorState> {
     state = EditorState(mindMap: newMindMap);
   }
 
-  void _saveState() {
-    if (state.mindMap == null) return;
-
-    final newHistory = [...state.undoHistory, state.mindMap!];
-    if (newHistory.length > 50) {
-      newHistory.removeAt(0);
-    }
+  void _updateHistoryState() {
     state = state.copyWith(
-      undoHistory: newHistory,
-      redoHistory: [],
+      canUndo: _historyService.canUndo,
+      canRedo: _historyService.canRedo,
       hasChanges: true,
     );
   }
 
   void undo() {
-    if (state.undoHistory.isEmpty || state.mindMap == null) return;
+    if (state.mindMap == null || !_historyService.canUndo) return;
 
-    final newUndo = [...state.undoHistory];
-    final previousState = newUndo.removeLast();
-    final newRedo = [...state.redoHistory, state.mindMap!];
-
-    state = state.copyWith(
-      mindMap: previousState,
-      undoHistory: newUndo,
-      redoHistory: newRedo,
-    );
+    final result = _historyService.undo(state.mindMap!);
+    if (result != null) {
+      state = state.copyWith(
+        mindMap: result,
+        canUndo: _historyService.canUndo,
+        canRedo: _historyService.canRedo,
+      );
+    }
   }
 
   void redo() {
-    if (state.redoHistory.isEmpty) return;
+    if (state.mindMap == null || !_historyService.canRedo) return;
 
-    final newRedo = [...state.redoHistory];
-    final nextState = newRedo.removeLast();
-    final newUndo = [...state.undoHistory];
-    if (state.mindMap != null) {
-      newUndo.add(state.mindMap!);
+    final result = _historyService.redo(state.mindMap!);
+    if (result != null) {
+      state = state.copyWith(
+        mindMap: result,
+        canUndo: _historyService.canUndo,
+        canRedo: _historyService.canRedo,
+      );
     }
-
-    state = state.copyWith(
-      mindMap: nextState,
-      undoHistory: newUndo,
-      redoHistory: newRedo,
-    );
   }
 
   void addNode({String? parentId, required String text}) {
     if (state.mindMap == null) return;
-
-    _saveState();
 
     final mindMap = state.mindMap!;
     final nodeId = _uuid.v4();
@@ -143,7 +136,7 @@ class EditorNotifier extends Notifier<EditorState> {
       final angle = (childCount * 0.5) - 0.25;
       position = Offset(
         parent.position.dx + 200 * cos(angle),
-        parent.position.dy + 150 + (childCount * 50),
+        parent.position.dy + CanvasConstants.childYOffset + (childCount * 50),
       );
     } else {
       // Find a good position for root-level node
@@ -151,69 +144,58 @@ class EditorNotifier extends Notifier<EditorState> {
           .where((n) => n.parentId == null)
           .toList();
       position = Offset(
-        existingNodes.length * 250.0,
+        existingNodes.length * CanvasConstants.horizontalSpacing,
         0,
       );
     }
 
-    final newNode = MindMapNode(
-      id: nodeId,
+    final command = AddNodeCommand(
+      nodeId: nodeId,
       text: text,
       position: position,
       parentId: parentId,
+      color: Colors.blue,
     );
 
-    final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
-    updatedNodes[nodeId] = newNode;
-
-    // Update parent's childIds
-    if (parentId != null) {
-      final parent = updatedNodes[parentId]!;
-      updatedNodes[parentId] = parent.copyWith(
-        childIds: [...parent.childIds, nodeId],
-      );
-    }
-
-    state = state.copyWith(
-      mindMap: mindMap.copyWith(
-        nodes: updatedNodes,
-        rootNodeId: mindMap.rootNodeId ?? nodeId,
-      ),
-    );
+    final result = _historyService.execute(command, mindMap);
+    state = state.copyWith(mindMap: result);
+    _updateHistoryState();
   }
 
   void updateNodeText(String nodeId, String text) {
     if (state.mindMap == null) return;
 
-    _saveState();
-
     final mindMap = state.mindMap!;
     final node = mindMap.nodes[nodeId];
     if (node == null) return;
 
-    final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
-    updatedNodes[nodeId] = node.copyWith(text: text);
-
-    state = state.copyWith(
-      mindMap: mindMap.copyWith(nodes: updatedNodes),
+    final command = UpdateNodeTextCommand(
+      nodeId: nodeId,
+      newText: text,
+      oldText: node.text,
     );
+
+    final result = _historyService.execute(command, mindMap);
+    state = state.copyWith(mindMap: result);
+    _updateHistoryState();
   }
 
   void updateNodeColor(String nodeId, Color color) {
     if (state.mindMap == null) return;
 
-    _saveState();
-
     final mindMap = state.mindMap!;
     final node = mindMap.nodes[nodeId];
     if (node == null) return;
 
-    final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
-    updatedNodes[nodeId] = node.copyWith(color: color);
-
-    state = state.copyWith(
-      mindMap: mindMap.copyWith(nodes: updatedNodes),
+    final command = UpdateNodeColorCommand(
+      nodeId: nodeId,
+      newColor: color,
+      oldColor: node.color,
     );
+
+    final result = _historyService.execute(command, mindMap);
+    state = state.copyWith(mindMap: result);
+    _updateHistoryState();
   }
 
   void moveNode(String nodeId, Offset newPosition) {
@@ -223,6 +205,7 @@ class EditorNotifier extends Notifier<EditorState> {
     final node = mindMap.nodes[nodeId];
     if (node == null) return;
 
+    // Direct update without history for smooth dragging
     final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
     updatedNodes[nodeId] = node.copyWith(position: newPosition);
 
@@ -235,8 +218,6 @@ class EditorNotifier extends Notifier<EditorState> {
   void deleteNode(String nodeId) {
     if (state.mindMap == null) return;
 
-    _saveState();
-
     final mindMap = state.mindMap!;
     final node = mindMap.nodes[nodeId];
     if (node == null) return;
@@ -244,30 +225,37 @@ class EditorNotifier extends Notifier<EditorState> {
     // Can't delete root node
     if (node.parentId == null) return;
 
-    final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
+    // Collect all nodes to delete (node and descendants)
+    final deletedNodes = <String, MindMapNode>{};
+    _collectNodeAndDescendants(nodeId, mindMap.nodes, deletedNodes);
 
-    // Remove from parent's childIds
-    final parent = updatedNodes[node.parentId]!;
-    updatedNodes[node.parentId!] = parent.copyWith(
-      childIds: parent.childIds.where((id) => id != nodeId).toList(),
+    // Get parent's current childIds
+    final parent = mindMap.nodes[node.parentId]!;
+
+    final command = DeleteNodeCommand(
+      nodeId: nodeId,
+      deletedNodes: deletedNodes,
+      parentId: node.parentId,
+      parentChildIds: List.from(parent.childIds),
     );
 
-    // Remove node and all descendants
-    _deleteNodeRecursive(nodeId, updatedNodes);
-
-    state = state.copyWith(
-      mindMap: mindMap.copyWith(nodes: updatedNodes),
-    );
+    final result = _historyService.execute(command, mindMap);
+    state = state.copyWith(mindMap: result);
+    _updateHistoryState();
   }
 
-  void _deleteNodeRecursive(String nodeId, Map<String, MindMapNode> nodes) {
+  void _collectNodeAndDescendants(
+    String nodeId,
+    Map<String, MindMapNode> nodes,
+    Map<String, MindMapNode> collected,
+  ) {
     final node = nodes[nodeId];
     if (node == null) return;
 
+    collected[nodeId] = node;
     for (final childId in node.childIds) {
-      _deleteNodeRecursive(childId, nodes);
+      _collectNodeAndDescendants(childId, nodes, collected);
     }
-    nodes.remove(nodeId);
   }
 
   void updateTitle(String title) {
@@ -282,50 +270,61 @@ class EditorNotifier extends Notifier<EditorState> {
   void autoLayout() {
     if (state.mindMap == null) return;
 
-    _saveState();
-
     final mindMap = state.mindMap!;
     if (mindMap.rootNodeId == null) return;
 
-    final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
-    _layoutNode(
+    // Store old positions
+    final oldPositions = <String, Offset>{};
+    for (final entry in mindMap.nodes.entries) {
+      oldPositions[entry.key] = entry.value.position;
+    }
+
+    // Calculate new positions
+    final newPositions = <String, Offset>{};
+    _calculateLayoutPositions(
       mindMap.rootNodeId!,
       const Offset(0, 0),
       0,
-      updatedNodes,
+      mindMap.nodes,
+      newPositions,
     );
 
-    state = state.copyWith(
-      mindMap: mindMap.copyWith(nodes: updatedNodes),
+    final command = AutoLayoutCommand(
+      oldPositions: oldPositions,
+      newPositions: newPositions,
     );
+
+    final result = _historyService.execute(command, mindMap);
+    state = state.copyWith(mindMap: result);
+    _updateHistoryState();
   }
 
-  void _layoutNode(
+  void _calculateLayoutPositions(
     String nodeId,
     Offset position,
     int level,
     Map<String, MindMapNode> nodes,
+    Map<String, Offset> positions,
   ) {
     final node = nodes[nodeId];
     if (node == null) return;
 
-    nodes[nodeId] = node.copyWith(position: position);
+    positions[nodeId] = position;
 
     final childCount = node.childIds.length;
     if (childCount == 0) return;
 
-    const spacing = 180.0;
-    final totalHeight = (childCount - 1) * spacing;
+    final totalHeight = (childCount - 1) * CanvasConstants.verticalSpacing;
     var yOffset = -totalHeight / 2;
 
     for (var i = 0; i < childCount; i++) {
       final childId = node.childIds[i];
       final childPosition = Offset(
-        position.dx + 250,
+        position.dx + CanvasConstants.horizontalSpacing,
         position.dy + yOffset,
       );
-      _layoutNode(childId, childPosition, level + 1, nodes);
-      yOffset += spacing;
+      _calculateLayoutPositions(childId, childPosition, level + 1, nodes, positions);
+      yOffset += CanvasConstants.verticalSpacing;
     }
   }
 }

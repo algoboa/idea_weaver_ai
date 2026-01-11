@@ -162,17 +162,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
+                          maxLength: 254,
                           decoration: const InputDecoration(
                             labelText: 'Email',
                             prefixIcon: Icon(Icons.email_outlined),
                             border: OutlineInputBorder(),
+                            counterText: '',
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
                             }
-                            if (!value.contains('@')) {
-                              return 'Please enter a valid email';
+                            // RFC 5322 compliant email validation
+                            final emailRegex = RegExp(
+                              r'^[a-zA-Z0-9.!#$%&*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?)*$',
+                            );
+                            if (!emailRegex.hasMatch(value)) {
+                              return 'Please enter a valid email address';
                             }
                             return null;
                           },

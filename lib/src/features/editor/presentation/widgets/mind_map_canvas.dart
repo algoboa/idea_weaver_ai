@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/canvas_constants.dart';
 import '../../../../domain/models/mind_map.dart';
 
 class MindMapCanvas extends StatefulWidget {
@@ -32,159 +33,202 @@ class _MindMapCanvasState extends State<MindMapCanvas> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTapDown: (details) {
-            // Deselect when tapping canvas
-            widget.onNodeSelected('');
-          },
-          child: InteractiveViewer(
-            transformationController: widget.transformController,
-            boundaryMargin: const EdgeInsets.all(2000),
-            minScale: 0.3,
-            maxScale: 3.0,
-            child: SizedBox(
-              width: 4000,
-              height: 4000,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // Grid background
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _GridPainter(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.1),
-                      ),
-                    ),
-                  ),
+    final theme = Theme.of(context);
 
-                  // Connection lines
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _ConnectionPainter(
-                        nodes: widget.mindMap.nodes,
-                        center: const Offset(2000, 2000),
-                      ),
-                    ),
-                  ),
-
-                  // Nodes
-                  ...widget.mindMap.nodes.values.map(
-                    (node) => _buildNode(node),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+    return GestureDetector(
+      onTapDown: (details) {
+        // Deselect when tapping canvas
+        widget.onNodeSelected('');
       },
-    );
-  }
-
-  Widget _buildNode(MindMapNode node) {
-    final isSelected = widget.selectedNodeId == node.id;
-    final position = Offset(
-      2000 + node.position.dx,
-      2000 + node.position.dy,
-    );
-
-    return Positioned(
-      left: position.dx - 75,
-      top: position.dy - 30,
-      child: GestureDetector(
-        onTap: () => widget.onNodeSelected(node.id),
-        onDoubleTap: () => widget.onNodeDoubleTap(node.id),
-        onLongPressStart: (details) {
-          widget.onShowContextMenu(node.id, details.globalPosition);
-        },
-        onPanStart: (details) {
-          setState(() {
-            _draggingNodeId = node.id;
-          });
-        },
-        onPanUpdate: (details) {
-          if (_draggingNodeId == node.id) {
-            final scale =
-                widget.transformController.value.getMaxScaleOnAxis();
-            final newPosition = Offset(
-              node.position.dx + details.delta.dx / scale,
-              node.position.dy + details.delta.dy / scale,
-            );
-            widget.onNodeMoved(node.id, newPosition);
-          }
-        },
-        onPanEnd: (_) {
-          setState(() {
-            _draggingNodeId = null;
-          });
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: 150,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? node.color.withValues(alpha: 0.9)
-                : node.color.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? Colors.white : Colors.transparent,
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: node.color.withValues(alpha: 0.3),
-                blurRadius: isSelected ? 12 : 6,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      child: InteractiveViewer(
+        transformationController: widget.transformController,
+        boundaryMargin: const EdgeInsets.all(CanvasConstants.boundaryMargin),
+        minScale: CanvasConstants.minScale,
+        maxScale: CanvasConstants.maxScale,
+        child: SizedBox(
+          width: CanvasConstants.canvasWidth,
+          height: CanvasConstants.canvasHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Text(
-                node.text,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
+              // Grid background - wrapped in RepaintBoundary for isolation
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _GridPainter(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                    ),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
               ),
-              if (isSelected) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildNodeAction(
-                      icon: Icons.add,
-                      onTap: () => widget.onAddChildNode(node.id),
+
+              // Connection lines - only repaints when nodes change
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _ConnectionPainter(
+                      nodes: widget.mindMap.nodes,
                     ),
-                    const SizedBox(width: 8),
-                    _buildNodeAction(
-                      icon: Icons.edit,
-                      onTap: () => widget.onNodeDoubleTap(node.id),
-                    ),
-                  ],
+                  ),
                 ),
-              ],
+              ),
+
+              // Nodes - each wrapped in RepaintBoundary
+              ...widget.mindMap.nodes.values.map(
+                (node) => _MindMapNodeWidget(
+                  key: ValueKey(node.id),
+                  node: node,
+                  isSelected: widget.selectedNodeId == node.id,
+                  isDragging: _draggingNodeId == node.id,
+                  transformController: widget.transformController,
+                  onSelected: widget.onNodeSelected,
+                  onDoubleTap: widget.onNodeDoubleTap,
+                  onContextMenu: widget.onShowContextMenu,
+                  onAddChild: widget.onAddChildNode,
+                  onMoved: widget.onNodeMoved,
+                  onDragStart: (nodeId) => setState(() => _draggingNodeId = nodeId),
+                  onDragEnd: () => setState(() => _draggingNodeId = null),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildNodeAction({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
+/// Optimized node widget that only rebuilds when its specific node changes
+class _MindMapNodeWidget extends StatelessWidget {
+  final MindMapNode node;
+  final bool isSelected;
+  final bool isDragging;
+  final TransformationController transformController;
+  final Function(String) onSelected;
+  final Function(String) onDoubleTap;
+  final Function(String, Offset) onContextMenu;
+  final Function(String) onAddChild;
+  final Function(String, Offset) onMoved;
+  final Function(String) onDragStart;
+  final VoidCallback onDragEnd;
+
+  const _MindMapNodeWidget({
+    super.key,
+    required this.node,
+    required this.isSelected,
+    required this.isDragging,
+    required this.transformController,
+    required this.onSelected,
+    required this.onDoubleTap,
+    required this.onContextMenu,
+    required this.onAddChild,
+    required this.onMoved,
+    required this.onDragStart,
+    required this.onDragEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final position = Offset(
+      CanvasConstants.canvasCenterX + node.position.dx - CanvasConstants.nodeHalfWidth,
+      CanvasConstants.canvasCenterY + node.position.dy - CanvasConstants.nodeHalfHeight / 2,
+    );
+
+    return Positioned(
+      left: position.dx,
+      top: position.dy,
+      child: RepaintBoundary(
+        child: GestureDetector(
+          onTap: () => onSelected(node.id),
+          onDoubleTap: () => onDoubleTap(node.id),
+          onLongPressStart: (details) {
+            onContextMenu(node.id, details.globalPosition);
+          },
+          onPanStart: (details) => onDragStart(node.id),
+          onPanUpdate: (details) {
+            if (isDragging) {
+              final scale = transformController.value.getMaxScaleOnAxis();
+              final newPosition = Offset(
+                node.position.dx + details.delta.dx / scale,
+                node.position.dy + details.delta.dy / scale,
+              );
+              onMoved(node.id, newPosition);
+            }
+          },
+          onPanEnd: (_) => onDragEnd(),
+          child: AnimatedContainer(
+            duration: AnimationConstants.shortDuration,
+            width: CanvasConstants.nodeWidth,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? node.color.withValues(alpha: 0.9)
+                  : node.color.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? Colors.white : Colors.transparent,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: node.color.withValues(alpha: 0.3),
+                  blurRadius: isSelected ? 12 : 6,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  node.text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (isSelected) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _NodeActionButton(
+                        icon: Icons.add,
+                        onTap: () => onAddChild(node.id),
+                      ),
+                      const SizedBox(width: 8),
+                      _NodeActionButton(
+                        icon: Icons.edit,
+                        onTap: () => onDoubleTap(node.id),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Optimized action button - const constructor
+class _NodeActionButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _NodeActionButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -210,43 +254,65 @@ class _GridPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1;
 
-    const spacing = 50.0;
-
-    for (var x = 0.0; x < size.width; x += spacing) {
+    for (var x = 0.0; x < size.width; x += CanvasConstants.gridSpacing) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
 
-    for (var y = 0.0; y < size.height; y += spacing) {
+    for (var y = 0.0; y < size.height; y += CanvasConstants.gridSpacing) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _GridPainter oldDelegate) {
+    return color != oldDelegate.color;
+  }
 }
 
 class _ConnectionPainter extends CustomPainter {
   final Map<String, MindMapNode> nodes;
-  final Offset center;
 
-  _ConnectionPainter({
-    required this.nodes,
-    required this.center,
-  });
+  // Cache for node positions to detect changes
+  late final int _nodesHashCode;
+
+  _ConnectionPainter({required this.nodes})
+      : _nodesHashCode = _computeNodesHash(nodes);
+
+  static int _computeNodesHash(Map<String, MindMapNode> nodes) {
+    var hash = 0;
+    for (final node in nodes.values) {
+      hash ^= node.id.hashCode;
+      hash ^= node.position.dx.hashCode;
+      hash ^= node.position.dy.hashCode;
+      hash ^= (node.parentId?.hashCode ?? 0);
+      hash ^= node.color.toARGB32();
+    }
+    return hash;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
+    const center = Offset(
+      CanvasConstants.canvasCenterX,
+      CanvasConstants.canvasCenterY,
+    );
+
     for (final node in nodes.values) {
       if (node.parentId != null) {
         final parent = nodes[node.parentId];
         if (parent != null) {
-          _drawConnection(canvas, parent, node);
+          _drawConnection(canvas, parent, node, center);
         }
       }
     }
   }
 
-  void _drawConnection(Canvas canvas, MindMapNode parent, MindMapNode child) {
+  void _drawConnection(
+    Canvas canvas,
+    MindMapNode parent,
+    MindMapNode child,
+    Offset center,
+  ) {
     final startPoint = Offset(
       center.dx + parent.position.dx,
       center.dy + parent.position.dy,
@@ -257,8 +323,8 @@ class _ConnectionPainter extends CustomPainter {
     );
 
     final paint = Paint()
-      ..color = parent.color.withValues(alpha: 0.5)
-      ..strokeWidth = 3
+      ..color = parent.color.withValues(alpha: CanvasConstants.connectionOpacity)
+      ..strokeWidth = CanvasConstants.connectionLineWidth
       ..style = PaintingStyle.stroke;
 
     // Draw curved line
@@ -287,6 +353,6 @@ class _ConnectionPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ConnectionPainter oldDelegate) {
-    return nodes != oldDelegate.nodes;
+    return _nodesHashCode != oldDelegate._nodesHashCode;
   }
 }
