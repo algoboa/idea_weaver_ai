@@ -1,0 +1,181 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// AI suggestion with category
+class AiSuggestion {
+  final String text;
+  final String category;
+  final double confidence;
+
+  AiSuggestion({
+    required this.text,
+    required this.category,
+    this.confidence = 0.8,
+  });
+}
+
+/// AI Service for generating suggestions
+class AiService {
+  /// Fetch AI suggestions for a keyword
+  /// This is a mock implementation that simulates LLM API calls
+  Future<List<AiSuggestion>> fetchSuggestions(String keyword) async {
+    // Simulate API delay
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Generate mock suggestions based on the keyword
+    return _generateMockSuggestions(keyword);
+  }
+
+  List<AiSuggestion> _generateMockSuggestions(String keyword) {
+    final normalizedKeyword = keyword.toLowerCase().trim();
+
+    // Base suggestions that work for any keyword
+    final suggestions = <AiSuggestion>[
+      AiSuggestion(
+        text: '$keyword - Implementation Strategy',
+        category: 'related',
+      ),
+      AiSuggestion(
+        text: '$keyword - Key Benefits',
+        category: 'related',
+      ),
+      AiSuggestion(
+        text: 'What if $keyword was not possible?',
+        category: 'opposite',
+      ),
+      AiSuggestion(
+        text: 'Alternative to $keyword',
+        category: 'opposite',
+      ),
+      AiSuggestion(
+        text: 'Why is $keyword important?',
+        category: 'question',
+      ),
+      AiSuggestion(
+        text: 'How can $keyword be improved?',
+        category: 'question',
+      ),
+      AiSuggestion(
+        text: 'Who benefits from $keyword?',
+        category: 'question',
+      ),
+      AiSuggestion(
+        text: '$keyword - Step 1',
+        category: 'expansion',
+      ),
+      AiSuggestion(
+        text: '$keyword - Future Vision',
+        category: 'expansion',
+      ),
+      AiSuggestion(
+        text: '$keyword - Resource Requirements',
+        category: 'expansion',
+      ),
+    ];
+
+    // Add context-specific suggestions
+    if (normalizedKeyword.contains('project') ||
+        normalizedKeyword.contains('product')) {
+      suggestions.addAll([
+        AiSuggestion(text: 'Target Audience', category: 'related'),
+        AiSuggestion(text: 'Market Analysis', category: 'related'),
+        AiSuggestion(text: 'Competition', category: 'related'),
+        AiSuggestion(text: 'Revenue Model', category: 'expansion'),
+        AiSuggestion(text: 'Launch Timeline', category: 'expansion'),
+      ]);
+    }
+
+    if (normalizedKeyword.contains('marketing') ||
+        normalizedKeyword.contains('strategy')) {
+      suggestions.addAll([
+        AiSuggestion(text: 'Digital Channels', category: 'related'),
+        AiSuggestion(text: 'Content Strategy', category: 'related'),
+        AiSuggestion(text: 'SEO/SEM', category: 'expansion'),
+        AiSuggestion(text: 'Influencer Partnership', category: 'expansion'),
+        AiSuggestion(text: 'What if budget is limited?', category: 'opposite'),
+      ]);
+    }
+
+    if (normalizedKeyword.contains('app') ||
+        normalizedKeyword.contains('mobile') ||
+        normalizedKeyword.contains('web')) {
+      suggestions.addAll([
+        AiSuggestion(text: 'User Experience', category: 'related'),
+        AiSuggestion(text: 'Performance', category: 'related'),
+        AiSuggestion(text: 'Security', category: 'related'),
+        AiSuggestion(text: 'Scalability', category: 'expansion'),
+        AiSuggestion(text: 'Native vs Cross-platform?', category: 'question'),
+      ]);
+    }
+
+    if (normalizedKeyword.contains('idea') ||
+        normalizedKeyword.contains('brainstorm')) {
+      suggestions.addAll([
+        AiSuggestion(text: 'Feasibility Analysis', category: 'related'),
+        AiSuggestion(text: 'Innovation Potential', category: 'related'),
+        AiSuggestion(text: 'Risk Assessment', category: 'expansion'),
+        AiSuggestion(
+            text: 'What problems does this solve?', category: 'question'),
+        AiSuggestion(
+            text: 'What if this already exists?', category: 'opposite'),
+      ]);
+    }
+
+    return suggestions;
+  }
+
+  /// Generate AI summary of a mind map
+  Future<String> generateSummary(
+      Map<String, dynamic> nodes, String rootNodeId) async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Mock summary generation
+    final nodeCount = nodes.length;
+    return '''
+Based on your mind map with $nodeCount nodes, here's a structured summary:
+
+**Main Topic**: The central theme explores key concepts and their relationships.
+
+**Key Points**:
+- Multiple interconnected ideas have been identified
+- The structure suggests a hierarchical approach
+- Several expansion opportunities exist
+
+**Recommendations**:
+1. Consider adding more detail to leaf nodes
+2. Look for cross-connections between branches
+3. Prioritize the most impactful ideas
+
+This analysis was generated by AI and should be reviewed for accuracy.
+''';
+  }
+
+  /// Auto-structure nodes using AI
+  Future<Map<String, dynamic>> autoStructure(
+    List<String> nodeTexts,
+    String framework,
+  ) async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Mock auto-structuring
+    switch (framework) {
+      case 'swot':
+        return {
+          'strengths': nodeTexts.take(2).toList(),
+          'weaknesses': nodeTexts.skip(2).take(2).toList(),
+          'opportunities': nodeTexts.skip(4).take(2).toList(),
+          'threats': nodeTexts.skip(6).toList(),
+        };
+      case 'logicTree':
+      default:
+        return {
+          'root': nodeTexts.first,
+          'branches': nodeTexts.skip(1).toList(),
+        };
+    }
+  }
+}
+
+/// Provider for AI service
+final aiServiceProvider = Provider<AiService>((ref) {
+  return AiService();
+});

@@ -1,0 +1,57 @@
+name: idea_weaver_ai
+description: "AI-powered mind mapping app for brainstorming and idea generation"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State Management
+  flutter_riverpod: any
+  riverpod_annotation: any
+
+  # Navigation
+  go_router: any
+
+  # UI
+  material_color_utilities: any
+  google_fonts: any
+
+  # Firebase
+  firebase_core: any
+  firebase_auth: any
+  cloud_firestore: any
+  firebase_storage: any
+
+  # Other utilities
+  speech_to_text: any
+  share_plus: any
+  path_provider: any
+  pdf: any
+  image: any
+  uuid: any
+  intl: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  riverpod_generator: any
+  build_runner: any
+  integration_test:
+    sdk: flutter
+  mockito: any
+  build_verify: any
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
