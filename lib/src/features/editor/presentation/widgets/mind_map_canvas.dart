@@ -285,7 +285,7 @@ class _ConnectionPainter extends CustomPainter {
       hash ^= node.position.dx.hashCode;
       hash ^= node.position.dy.hashCode;
       hash ^= (node.parentId?.hashCode ?? 0);
-      hash ^= node.color.toARGB32();
+      hash ^= node.color.value;
     }
     return hash;
   }

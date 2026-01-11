@@ -43,9 +43,10 @@ class AddNodeCommand extends EditorCommand {
     updatedNodes[nodeId] = newNode;
 
     // Update parent's childIds
-    if (parentId != null && updatedNodes.containsKey(parentId)) {
-      final parent = updatedNodes[parentId]!;
-      updatedNodes[parentId] = parent.copyWith(
+    final pid = parentId;
+    if (pid != null && updatedNodes.containsKey(pid)) {
+      final parent = updatedNodes[pid]!;
+      updatedNodes[pid] = parent.copyWith(
         childIds: [...parent.childIds, nodeId],
       );
     }
@@ -61,9 +62,10 @@ class AddNodeCommand extends EditorCommand {
     final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
 
     // Remove from parent's childIds
-    if (parentId != null && updatedNodes.containsKey(parentId)) {
-      final parent = updatedNodes[parentId]!;
-      updatedNodes[parentId] = parent.copyWith(
+    final pid = parentId;
+    if (pid != null && updatedNodes.containsKey(pid)) {
+      final parent = updatedNodes[pid]!;
+      updatedNodes[pid] = parent.copyWith(
         childIds: parent.childIds.where((id) => id != nodeId).toList(),
       );
     }
@@ -164,9 +166,10 @@ class DeleteNodeCommand extends EditorCommand {
     final updatedNodes = Map<String, MindMapNode>.from(mindMap.nodes);
 
     // Update parent's childIds
-    if (parentId != null && updatedNodes.containsKey(parentId)) {
-      final parent = updatedNodes[parentId]!;
-      updatedNodes[parentId] = parent.copyWith(
+    final pid = parentId;
+    if (pid != null && updatedNodes.containsKey(pid)) {
+      final parent = updatedNodes[pid]!;
+      updatedNodes[pid] = parent.copyWith(
         childIds: parent.childIds.where((id) => id != nodeId).toList(),
       );
     }
@@ -187,9 +190,10 @@ class DeleteNodeCommand extends EditorCommand {
     updatedNodes.addAll(deletedNodes);
 
     // Restore parent's childIds
-    if (parentId != null && updatedNodes.containsKey(parentId)) {
-      final parent = updatedNodes[parentId]!;
-      updatedNodes[parentId] = parent.copyWith(childIds: parentChildIds);
+    final pid = parentId;
+    if (pid != null && updatedNodes.containsKey(pid)) {
+      final parent = updatedNodes[pid]!;
+      updatedNodes[pid] = parent.copyWith(childIds: parentChildIds);
     }
 
     return mindMap.copyWith(nodes: updatedNodes);

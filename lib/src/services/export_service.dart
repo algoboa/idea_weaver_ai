@@ -177,7 +177,7 @@ class ExportService {
               height: 8,
               margin: const pw.EdgeInsets.only(top: 4, right: 8),
               decoration: pw.BoxDecoration(
-                color: PdfColor.fromInt(node.color.toARGB32()),
+                color: PdfColor.fromInt(node.color.value),
                 shape: pw.BoxShape.circle,
               ),
             ),

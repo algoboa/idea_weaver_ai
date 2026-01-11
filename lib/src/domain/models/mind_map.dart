@@ -61,7 +61,7 @@ class MindMapNode {
       'positionY': position.dy,
       'parentId': parentId,
       'childIds': childIds,
-      'color': color.toARGB32(),
+      'color': color.value,
       'isExpanded': isExpanded,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
