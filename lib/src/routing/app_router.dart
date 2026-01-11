@@ -24,6 +24,9 @@ class AppRoutes {
   static String exportPath(String id) => '/export/$id';
 }
 
+/// Set to true to bypass authentication for testing (development only)
+const bool kDebugSkipAuth = false;
+
 /// App router provider
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -32,6 +35,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
     redirect: (context, state) {
+      // Skip auth check in debug mode
+      if (kDebugSkipAuth) {
+        return null;
+      }
+
       final isLoggedIn = authState.value != null;
       final isLoggingIn = state.matchedLocation == AppRoutes.login;
       final isRegistering = state.matchedLocation == AppRoutes.register;
